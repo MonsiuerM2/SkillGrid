@@ -176,7 +176,7 @@ namespace DMed_Razor.Controllers
             {
                 return BadRequest("No course with that ID exists");
             }
-
+            //
             List<int> moduleIdList = await _context.CourseModules
                         .Where(cm => cm.CourseId == CourseId)
                         .Select(cm => cm.ModuleId)
