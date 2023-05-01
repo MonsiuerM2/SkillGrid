@@ -26,6 +26,11 @@ namespace DMed_Razor.Helpers
         {
             return await _context.Courses.Where(cm => cm.CourseId == courseId).AnyAsync();
         }
+
+        public async Task<bool> CourseAlreadyRegistered(int courseId, int studentId)
+        {
+            return await _context.CourseRegistrations.Where(cm => cm.CourseId == courseId && cm.StudentId == studentId).AnyAsync();
+        }
     }
 
 

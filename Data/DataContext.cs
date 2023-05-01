@@ -19,7 +19,9 @@ namespace DMed_Razor.Data
         public DbSet<Organization> Organizations { get; set; }
         public DbSet<Course> Courses { get; set; }
         public DbSet<ModuleAssignment> ModuleAssignments { get; set; }
-        public DbSet<Registration> Registration { get; set; }
+        public DbSet<ModuleRegistration> ModuleRegistrations { get; set; }
+        public DbSet<CourseRegistration> CourseRegistrations { get; set; }
+
         public DbSet<Session> Session { get; set; }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -81,8 +83,14 @@ namespace DMed_Razor.Data
                 .WithMany()
                 .HasForeignKey(u => u.ModuleId);
 
-            //REGISTRATION
-            builder.Entity<Registration>()
+            //MODULE REGISTRATION
+            builder.Entity<ModuleRegistration>()
+                .HasOne(ur => ur.Student)
+                .WithMany()
+                .HasForeignKey(reg => reg.StudentId);
+
+            //COURSE REGISTRATION
+            builder.Entity<CourseRegistration>()
                 .HasOne(ur => ur.Student)
                 .WithMany()
                 .HasForeignKey(reg => reg.StudentId);

@@ -193,6 +193,31 @@ namespace DMedRazor.Migrations
                     b.ToTable("CourseModules");
                 });
 
+            modelBuilder.Entity("DMed_Razor.Entities.CourseRegistration", b =>
+                {
+                    b.Property<int>("CourseRegId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CourseEnrolledtDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CourseRegId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("CourseRegistrations");
+                });
+
             modelBuilder.Entity("DMed_Razor.Entities.Module", b =>
                 {
                     b.Property<int>("ModuleId")
@@ -253,24 +278,9 @@ namespace DMedRazor.Migrations
                     b.ToTable("ModulePreReqs");
                 });
 
-            modelBuilder.Entity("DMed_Razor.Entities.Organization", b =>
+            modelBuilder.Entity("DMed_Razor.Entities.ModuleRegistration", b =>
                 {
-                    b.Property<int>("OrgId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("OrgId");
-
-                    b.ToTable("Organizations");
-                });
-
-            modelBuilder.Entity("DMed_Razor.Entities.Registration", b =>
-                {
-                    b.Property<int>("RegId")
+                    b.Property<int>("ModuleRegId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
@@ -289,14 +299,26 @@ namespace DMedRazor.Migrations
                     b.Property<int>("StudentId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("isModule")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("RegId");
+                    b.HasKey("ModuleRegId");
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("Registration");
+                    b.ToTable("ModuleRegistrations");
+                });
+
+            modelBuilder.Entity("DMed_Razor.Entities.Organization", b =>
+                {
+                    b.Property<int>("OrgId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OrgId");
+
+                    b.ToTable("Organizations");
                 });
 
             modelBuilder.Entity("DMed_Razor.Entities.Session", b =>
@@ -453,6 +475,17 @@ namespace DMedRazor.Migrations
                     b.Navigation("Module");
                 });
 
+            modelBuilder.Entity("DMed_Razor.Entities.CourseRegistration", b =>
+                {
+                    b.HasOne("DMed_Razor.Entities.AppUser", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("DMed_Razor.Entities.ModuleAssignment", b =>
                 {
                     b.HasOne("DMed_Razor.Entities.AppUser", "Lecturer")
@@ -491,7 +524,7 @@ namespace DMedRazor.Migrations
                     b.Navigation("PreReq");
                 });
 
-            modelBuilder.Entity("DMed_Razor.Entities.Registration", b =>
+            modelBuilder.Entity("DMed_Razor.Entities.ModuleRegistration", b =>
                 {
                     b.HasOne("DMed_Razor.Entities.AppUser", "Student")
                         .WithMany()

@@ -16,6 +16,26 @@ namespace DMed_Razor.Helpers
             _userManager = userManager;
         }
 
+        public async Task<bool> UserExists(int userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+            {
+                return false;
+            }
+            return true;
+        }
+        public async Task<bool> UserExists(int userId, string userRole)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+            {
+                return false;
+            }
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+            return userRoles.Contains(userRole);
+        }
         public async Task<bool> UsernameExists(string username)
         {
             return await _userManager.Users.AnyAsync(x => x.UserName == username.ToLower());

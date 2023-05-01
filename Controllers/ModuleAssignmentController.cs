@@ -41,13 +41,18 @@ namespace DMed_Razor.Controllers
             var module = await _context.Modules
                 .SingleOrDefaultAsync(m => m.ModuleId == modAcssignDto.ModuleId);
             var user = await _userManager.FindByIdAsync(modAcssignDto.LecturerId.ToString());
+            if (user == null)
+            {
+                return NotFound("There is no lecturer with that ID");
+            }
+
             var userRoles = await _userManager.GetRolesAsync(user);
 
             if (module == null)
             {
                 return NotFound("There is no module with that ID");
             }
-            else if (user == null || !userRoles.Contains("Lecturer"))
+            else if (!userRoles.Contains("Lecturer"))
             {
                 return NotFound("There is no lecturer with that ID");
             }

@@ -14,6 +14,7 @@ namespace DMed_Razor.Controllers
     {
         private readonly DataContext _context;
         private readonly CourseModuleHelper _cmHelper;
+        private readonly AccountHelper _accHelper;
         private readonly UserManager<AppUser> _userManager;
 
         public ModuleController(DataContext context, UserManager<AppUser> userManager)
@@ -21,6 +22,7 @@ namespace DMed_Razor.Controllers
             _userManager = userManager;
             _context = context;
             _cmHelper = new CourseModuleHelper(_context);
+            _accHelper = new AccountHelper(_userManager);
         }
 
 
@@ -152,54 +154,45 @@ namespace DMed_Razor.Controllers
         }
 
         [HttpPost("enroll")]
-        public async Task<IActionResult> EnrollModule(EnrollDto enrollDto)
+        public async Task<IActionResult> EnrollModule(ModuleEnrollDto moduleEnrollDto)
         {
-            ModuleAssignment moduleAssignment = await _context.ModuleAssignments
-                .FirstOrDefaultAsync(ma => ma.AssignmentId == enrollDto.AssignmentId);
+            var moduleAssignment = await _context.ModuleAssignments
+                .FirstOrDefaultAsync(ma => ma.AssignmentId == moduleEnrollDto.AssignmentId);
 
-            if (moduleAssignment == null)
+            if (moduleAssignment == null) return NotFound("There is no module assignment with that ID");
+
+            var isEnrolled = await _context.ModuleRegistrations
+                .AnyAsync(r => r.Student.Id == moduleEnrollDto.StudentId && r.LectureId == moduleEnrollDto.AssignmentId);
+            if (isEnrolled) return BadRequest("You are already enrolled in that course/module with the same teacher. " +
+                "You could enroll in the same module if another lecturer is teaching it.");
+
+            var module = await GetModule(moduleAssignment.ModuleId);
+
+            if (module == null) return NotFound("There is no module with that ID");
+
+            if (!await _accHelper.UserExists(moduleEnrollDto.StudentId, "Student"))
             {
-                return NotFound("There is no module assignment with that ID");
+                return BadRequest("No student with that ID exists");
             }
 
-            if (await _context.Registration
-                .AnyAsync(r => r.Student.Id == enrollDto.StudentId && r.LectureId == enrollDto.AssignmentId && r.isModule))
-            {
-                return BadRequest("You are already enrolled in that course/module.");
-            }
+            AppUser student = await _userManager.FindByIdAsync(moduleEnrollDto.StudentId.ToString());
 
-            ModuleViewDto module = (await GetModule(moduleAssignment.ModuleId)).Value;
-
-            if (module == null)
-            {
-                return NotFound("There is no module with that ID");
-            }
-
-            AppUser student = await _userManager.FindByIdAsync(enrollDto.StudentId.ToString());
-
-            if (student == null || !(await _userManager.IsInRoleAsync(student, "Student")))
-            {
-                return NotFound("There is no student with that ID");
-            }
-
-            List<int> studentCompletedModules = await _context.Registration
-                .Where(reg => reg.isModule && reg.Student.Id == enrollDto.StudentId && reg.Completed)
+            var completedLectureIds = await _context.ModuleRegistrations
+                .Where(reg => reg.Student.Id == moduleEnrollDto.StudentId && reg.Completed)
                 .Select(reg => reg.LectureId)
                 .ToListAsync();
 
-            var studentCompletedModulesIds = (await _context.ModuleAssignments
-                .Where(m => studentCompletedModules.Contains(m.AssignmentId))
-                .Select(m => m.ModuleId)
-                .ToListAsync());
+            var completedModuleIds = await _context.ModuleAssignments
+                .Where(ma => completedLectureIds.Contains(ma.AssignmentId))
+                .Select(ma => ma.ModuleId)
+                .ToListAsync();
 
-            List<int> notCompletedPrerequisiteIds = module.ModulePreReqs
-                .Where(p => !studentCompletedModulesIds.Contains(p.PreReqId))
-                .Select(p => p.PreReqId)
-                .ToList();
+            List<int> notCompletedPrerequisiteIds = module.Value.ModulePreReqs
+                .Where(p => !completedModuleIds.Contains(p.PreReqId)).Select(p => p.PreReqId).ToList();
 
             if (notCompletedPrerequisiteIds.Any())
             {
-                List<Module> notCompletedPrerequisites = await _context.Modules
+                var notCompletedPrerequisites = await _context.Modules
                     .Where(m => notCompletedPrerequisiteIds.Contains(m.ModuleId))
                     .ToListAsync();
 
@@ -210,26 +203,22 @@ namespace DMed_Razor.Controllers
                 });
             }
 
-            Registration registration = new Registration
+            var registration = new ModuleRegistration
             {
-                Student = await _userManager.FindByIdAsync(enrollDto.StudentId.ToString()),
-                LectureId = enrollDto.AssignmentId,
-                isModule = true,
-                StudentId = enrollDto.StudentId,
+                Student = student,
+                LectureId = moduleEnrollDto.AssignmentId,
+                StudentId = moduleEnrollDto.StudentId,
                 Completed = false
             };
-
-            await _context.Registration.AddAsync(registration);
+            await _context.ModuleRegistrations.AddAsync(registration);
             await _context.SaveChangesAsync();
-
             return Ok("You have successfully enrolled in the module.");
-
         }
 
         [HttpGet("get-registrations")]
-        public async Task<ActionResult<IEnumerable<Registration>>> GetRegistrations(RegistrationGetDto registrationGetDto)
+        public async Task<ActionResult<IEnumerable<ModuleRegistration>>> GetRegistrations(RegistrationGetDto registrationGetDto)
         {
-            var registrationsQuery = _context.Registration.AsQueryable();
+            var registrationsQuery = _context.ModuleRegistrations.AsQueryable();
 
             if (registrationGetDto.IncludeStudent)
                 registrationsQuery = registrationsQuery.Include(m => m.Student);
@@ -241,9 +230,8 @@ namespace DMed_Razor.Controllers
         [HttpPost("complete-module")]
         public async Task<IActionResult> CompleteModule(CompleteModuleDto completeModuleDto)
         {
-            Registration? studentModule = await _context.Registration
+            ModuleRegistration? studentModule = await _context.ModuleRegistrations
                 .Include(reg => reg.Student)
-                .Where(reg => reg.isModule)
                 .SingleOrDefaultAsync(r => r.Student.Id == completeModuleDto.StudentId
                     && r.LectureId == completeModuleDto.LectureId);
 
@@ -264,9 +252,8 @@ namespace DMed_Razor.Controllers
         [HttpDelete("deregister")]
         public async Task<IActionResult> Deregister(DeregisterDto deregisterDto)
         {
-            Registration? studentModule = await _context.Registration
+            ModuleRegistration? studentModule = await _context.ModuleRegistrations
                 .Include(reg => reg.Student)
-                .Where(reg => reg.isModule)
                 .SingleOrDefaultAsync(r => r.Student.Id == deregisterDto.StudentId
                     && r.LectureId == deregisterDto.LectureId);
 
@@ -275,7 +262,7 @@ namespace DMed_Razor.Controllers
                 return NotFound("You have not enrolled in that course.");
             }
 
-            _context.Registration.Remove(studentModule);
+            _context.ModuleRegistrations.Remove(studentModule);
             await _context.SaveChangesAsync();
 
             return Ok("You have successfully deregistered yourself from this module.");
