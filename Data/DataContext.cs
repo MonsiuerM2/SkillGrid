@@ -22,7 +22,8 @@ namespace DMed_Razor.Data
         public DbSet<ModuleRegistration> ModuleRegistrations { get; set; }
         public DbSet<CourseRegistration> CourseRegistrations { get; set; }
 
-        public DbSet<Session> Session { get; set; }
+        public DbSet<Session> Sessions { get; set; }
+        public DbSet<SessionRegistration> SessionRegistrations { get; set; }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));

@@ -10,9 +10,11 @@ namespace DMed_Razor.Helpers
     public class AccountHelper
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly RoleManager<AppRole> _roleManager;
 
-        public AccountHelper(UserManager<AppUser> userManager)
+        public AccountHelper(UserManager<AppUser> userManager, RoleManager<AppRole> roleManager)
         {
+            _roleManager = roleManager;
             _userManager = userManager;
         }
 
@@ -36,16 +38,34 @@ namespace DMed_Razor.Helpers
             var userRoles = await _userManager.GetRolesAsync(user);
             return userRoles.Contains(userRole);
         }
+        public async Task<bool> CheckUserRole(int userId, string roleName)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            var role = await _roleManager.FindByNameAsync(roleName);
+            var isInRole = await _userManager.IsInRoleAsync(user, roleName);
+
+            return isInRole;
+        }
+
         public async Task<bool> UsernameExists(string username)
         {
             return await _userManager.Users.AnyAsync(x => x.UserName == username.ToLower());
         }
-
         public async Task<bool> EmailExists(string email)
         {
             return await _userManager.Users.AnyAsync(x => x.Email == email.ToLower());
         }
+        public async Task<List<AppUser>> GetUsersByRoleId(int roleId)
+        {
+            var role = await _roleManager.FindByIdAsync(roleId.ToString());
+            var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name);
 
+            return usersInRole.ToList();
+        }
+        public async Task<AppUser> GetUser(int userId)
+        {
+            return await _userManager.FindByIdAsync(userId.ToString());
+        }
         public byte[] CreateSalt()
         {
             var buffer = new byte[16];

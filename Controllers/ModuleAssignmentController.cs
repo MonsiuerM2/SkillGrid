@@ -1,13 +1,15 @@
 ﻿using DMed_Razor.Data;
 using DMed_Razor.DTOs.CMEs;
 using DMed_Razor.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace DMed_Razor.Controllers
 {
-
+    [Authorize(Roles = "Admin")]
     public class ModuleAssignmentController : BaseApiController
     {
         private readonly DataContext _context;

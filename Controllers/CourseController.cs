@@ -2,14 +2,17 @@
 using DMed_Razor.DTOs.CMEs;
 using DMed_Razor.Entities;
 using DMed_Razor.Helpers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace DMed_Razor.Controllers
 {
+    [Authorize(Roles = "Student,Admin")]
     public class CourseController : BaseApiController
     {
         private readonly DataContext _context;
@@ -17,12 +20,13 @@ namespace DMed_Razor.Controllers
         private readonly CourseModuleHelper _cmHelper;
         private readonly AccountHelper _accHelper;
 
-        public CourseController(DataContext context, UserManager<AppUser> userManager)
+        public CourseController(DataContext context, UserManager<AppUser> userManager, RoleManager<AppRole> roleManager)
         {
             _userManager = userManager;
             _context = context;
             _cmHelper = new CourseModuleHelper(_context);
-            _accHelper = new AccountHelper(_userManager);
+            _accHelper = new AccountHelper(userManager, roleManager);
+
         }
 
         [HttpPost("add")]
@@ -78,7 +82,7 @@ namespace DMed_Razor.Controllers
                {
                    CourseId = mp.CourseId,
                    Name = mp.Name,
-                   ModulesList = new List<CourseModules>()
+                   ModulesList = new List<CourseModules>(),
                })
                .FirstOrDefaultAsync();
 
@@ -145,12 +149,16 @@ namespace DMed_Razor.Controllers
         }
 
         [HttpGet("mod-prereqs/{CourseId}")]
-        public async Task<ActionResult<List<Module>>> GetCourseModulePreReqs(int CourseId)
+        public async Task<ActionResult<List<Module>>> GetCourseModulePreReqs(int CourseId, bool IncludeSamePreReqs = true)
         {
             if (!await _cmHelper.CourseExists(CourseId))
             {
                 return BadRequest("No course with that ID exists");
             }
+
+            Course? course = (await GetCourse(CourseId)).Value;
+
+
             List<int> ModulesIdsList = await
                 _context.CourseModules
                         .Where(cm => cm.CourseId == CourseId)
@@ -159,6 +167,7 @@ namespace DMed_Razor.Controllers
 
             List<Module> courseModulePreReqsIds = await _context.ModulePreReqs
                     .Where(m => ModulesIdsList.Contains(m.ModuleId))
+                    .Where(m => IncludeSamePreReqs ? !ModulesIdsList.Contains(m.PreReqId) : true)
                     .Select(cm => cm.PreReq)
                     .Distinct()
                     .ToListAsync();
@@ -275,8 +284,6 @@ namespace DMed_Razor.Controllers
 
         }
 
-
-
         [HttpPost("enroll")]
         public async Task<IActionResult> EnrollCourse(CourseEnrollDto courseEnrollDto)
         {
@@ -298,6 +305,16 @@ namespace DMed_Razor.Controllers
             List<int>? modulesIdList = courseEnrollDto.ModuleMAs?.Select(pair => pair.Key).ToList();
 
             var modules = (course.ModulesList.Where(c => !modulesIdList.Contains(c.ModuleId)).ToList());
+
+            for (int i = 0; i < modules.Count(); i++)
+            {
+                var temp = await _context.ModuleAssignments.Where(ma => ma.ModuleId == modules[i].ModuleId).Select(ma => ma.AssignmentId).ToListAsync();
+
+                if (await _context.ModuleRegistrations.Where(mr => courseEnrollDto.StudentId == mr.StudentId && temp.Contains(mr.LectureId)).AnyAsync())
+                {
+                    modules.Remove(modules[i]);
+                }
+            }
 
             if (modules.Any())
             {
@@ -399,6 +416,172 @@ namespace DMed_Razor.Controllers
             await _context.CourseRegistrations.AddAsync(courseRegistration);
             await _context.SaveChangesAsync();
             return Ok("You have successfully enrolled in the course.");
+        }
+
+        [HttpPost("complete-course")]
+        public async Task<IActionResult> CompleteCourse(CompleteCourseDto completeCourseDto)
+        {
+            /*if (!await _cmHelper.CourseExists(completeCourseDto.CourseId))
+            {
+                return BadRequest("No course with that ID exists.");
+            }
+            if (!await _accHelper.UserExists(completeCourseDto.StudentId, "Student"))
+            {
+                return BadRequest("No student with that ID exists.");
+            }
+            if (!await _cmHelper.CourseAlreadyRegistered(completeCourseDto.CourseId, completeCourseDto.StudentId))
+            {
+                return BadRequest("You have not registered for that course.");
+            }
+
+            Course? course = (await GetCourse(completeCourseDto.CourseId)).Value;
+
+            List<int> ModulesIdsList = await
+                _context.CourseModules
+                        .Where(cm => cm.CourseId == completeCourseDto.CourseId)
+                        .Select(cm => cm.ModuleId)
+                        .ToListAsync();
+
+
+            var studentModuleRegistrations = await _context.ModuleRegistrations
+                .Where(cr => cr.StudentId == completeCourseDto.StudentId)
+                .Select(cr => new ModuleRegistration
+                {
+                    LectureId = cr.LectureId,
+                    Completed = cr.Completed
+                })
+                .ToListAsync();
+
+            var studentModuleIdList = await _context.ModuleAssignments
+                .Where(ma => studentModuleRegistrations.Select(cr => cr.LectureId).ToList().Contains(ma.AssignmentId))
+                .Select(cr => new ModuleAssignment
+                {
+                    AssignmentId = cr.AssignmentId,
+                    ModuleId = cr.ModuleId
+                })
+                .ToListAsync();
+
+            var moduleList = studentModuleRegistrations
+                    .Join(studentModuleIdList,
+                          o => o.LectureId,
+                          c => c.AssignmentId,
+                          (o, c) => new
+                          {
+                              ModuleId = c.ModuleId,
+                              Completed = o.Completed
+                          })
+                    .ToList();
+
+            List<int> notRegedModules = moduleList.Where(ml => !ModulesIdsList.Contains(ml.ModuleId)).Select(ml => ml.ModuleId).ToList();
+            List<int> notCompletedModules = moduleList.Where(ml => !ml.Completed).Select(ml => ml.ModuleId).ToList();
+
+            var notModules = notRegedModules.Concat(notCompletedModules);
+
+            if (notCompletedModules.Any())
+            {
+                return BadRequest(new
+                {
+                    message = "You have not completed these modules.",
+                    moduleList = await _context.Modules
+                                    .Where(m => notModules.Contains(m.ModuleId))
+                                    .Select(mp => new ModuleViewDto
+                                    {
+                                        ModuleId = mp.ModuleId,
+                                        MaxDurationHours = mp.maxDurationHours,
+                                        Name = mp.Name
+                                    })
+                                    .ToListAsync()
+
+                });
+            }
+
+
+            CourseRegistration courseRegistration = await _context.CourseRegistrations
+                .Where(cm => cm.CourseId == completeCourseDto.CourseId && cm.StudentId == completeCourseDto.StudentId)
+                .FirstOrDefaultAsync();
+
+            courseRegistration.Completed = true;
+            await _context.SaveChangesAsync();
+
+            return Ok("You have successfully completed this course.");*/
+
+            if (!await _cmHelper.CourseExists(completeCourseDto.CourseId))
+            {
+                return BadRequest("No course with that ID exists.");
+            }
+
+            if (!await _accHelper.UserExists(completeCourseDto.StudentId, "Student"))
+            {
+                return BadRequest("No student with that ID exists.");
+            }
+
+            if (!await _cmHelper.CourseAlreadyRegistered(completeCourseDto.CourseId, completeCourseDto.StudentId))
+            {
+                return BadRequest("You have not registered for that course.");
+            }
+
+            var moduleIds = await _context.CourseModules
+                .Where(cm => cm.CourseId == completeCourseDto.CourseId)
+                .Select(cm => cm.ModuleId)
+                .ToListAsync();
+
+            var incompleteModules = await _context.ModuleRegistrations
+                .Where(cr => cr.StudentId == completeCourseDto.StudentId && !cr.Completed)
+                .Join(_context.ModuleAssignments,
+                      cr => cr.LectureId,
+                      ma => ma.AssignmentId,
+                      (cr, ma) => ma.ModuleId)
+                .Where(mid => !moduleIds.Contains(mid))
+                .Distinct()
+                .ToListAsync();
+
+            if (incompleteModules.Any())
+            {
+                var moduleList = await _context.Modules
+                    .Where(m => incompleteModules.Contains(m.ModuleId))
+                    .Select(mp => new ModuleViewDto
+                    {
+                        ModuleId = mp.ModuleId,
+                        MaxDurationHours = mp.maxDurationHours,
+                        Name = mp.Name
+                    })
+                    .ToListAsync();
+
+                return BadRequest(new
+                {
+                    message = "You have not completed these modules.",
+                    moduleList
+                });
+            }
+
+            var registration = await _context.CourseRegistrations
+                .FirstOrDefaultAsync(cr => cr.CourseId == completeCourseDto.CourseId && cr.StudentId == completeCourseDto.StudentId);
+
+            registration.Completed = true;
+
+            await _context.SaveChangesAsync();
+
+            return Ok("You have successfully completed this course.");
+
+        }
+
+        [HttpDelete("deregister")]
+        public async Task<IActionResult> Deregister(DeregisterDto deregisterDto)
+        {
+            ModuleRegistration? studentModule = await _context.ModuleRegistrations
+                .Include(reg => reg.Student)
+                .SingleOrDefaultAsync(r => r.Student.Id == deregisterDto.StudentId
+                    && r.LectureId == deregisterDto.LectureId);
+
+            if (studentModule == null)
+            {
+                return NotFound("You have not enrolled in that course.");
+            }
+
+            _context.ModuleRegistrations.Remove(studentModule);
+            await _context.SaveChangesAsync();
+
+            return Ok("You have successfully deregistered yourself from this module.");
         }
 
 

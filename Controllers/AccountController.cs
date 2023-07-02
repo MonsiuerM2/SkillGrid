@@ -19,14 +19,16 @@ namespace DMed_Razor.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly IMapper _mapper;
         private readonly AccountHelper _accountHelper;
-        public AccountController(UserManager<AppUser> userManager, IMapper mapper, ILogger<AccountController> logger, ITokenService tokenService, EmailSender emailSender)
+        public AccountController(UserManager<AppUser> userManager, RoleManager<AppRole> roleManager,
+                                IMapper mapper, ILogger<AccountController> logger,
+                                ITokenService tokenService, EmailSender emailSender)
         {
             _mapper = mapper;
             _userManager = userManager;
             _logger = logger;
             _emailSender = emailSender;
             _tokenService = tokenService;
-            _accountHelper = new AccountHelper(userManager);
+            _accountHelper = new AccountHelper(userManager, roleManager);
 
         }
 
@@ -37,6 +39,10 @@ namespace DMed_Razor.Controllers
             {
                 return BadRequest("Username is taken, please try another one.");
             }
+            /*if (registerDto.IsLecturer && registerDto.IsOrganization)
+            {
+                return BadRequest("A user having an organization role can only have an organization role.");
+            }*/
             var endDate = DateTime.Parse(registerDto.DOB);
 
             var user = _mapper.Map<AppUser>(registerDto);
@@ -67,6 +73,7 @@ namespace DMed_Razor.Controllers
             {
                 role = "lecturer";
             }
+
             var roleResult = await _userManager.AddToRoleAsync(user, role);
             if (!roleResult.Succeeded) return BadRequest(roleResult.Errors);
 

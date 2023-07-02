@@ -28,6 +28,7 @@ namespace DMed_Razor.Data
                 new AppRole{Name = "Lecturer"},
                 new AppRole{Name = "Admin"},
                 new AppRole{Name = "Moderator"},
+                new AppRole{Name = "Organization"},
             };
 
             foreach (var role in roles)

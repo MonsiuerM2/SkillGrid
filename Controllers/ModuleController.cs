@@ -2,9 +2,11 @@
 using DMed_Razor.DTOs.CMEs;
 using DMed_Razor.Entities;
 using DMed_Razor.Helpers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -17,12 +19,12 @@ namespace DMed_Razor.Controllers
         private readonly AccountHelper _accHelper;
         private readonly UserManager<AppUser> _userManager;
 
-        public ModuleController(DataContext context, UserManager<AppUser> userManager)
+        public ModuleController(DataContext context, UserManager<AppUser> userManager, RoleManager<AppRole> roleManager)
         {
             _userManager = userManager;
             _context = context;
             _cmHelper = new CourseModuleHelper(_context);
-            _accHelper = new AccountHelper(_userManager);
+            _accHelper = new AccountHelper(userManager, roleManager);
         }
 
 
@@ -111,6 +113,7 @@ namespace DMed_Razor.Controllers
         }
 
         [HttpPost("add")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> AddModule(ModuleDto moduleDto)
         {
             if (await _cmHelper.ModuleExists(moduleDto.Name))

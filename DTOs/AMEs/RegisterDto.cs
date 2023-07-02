@@ -23,5 +23,6 @@ namespace DMed_Razor.DTOs.AMEs
         [StringLength(16, MinimumLength = 4)]
         public string Password { get; set; }
         public bool IsLecturer { get; set; } = false;
+        public bool IsOrganization { get; set; } = false;
     }
 }

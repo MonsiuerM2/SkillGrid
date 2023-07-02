@@ -8,7 +8,15 @@ namespace DMed_Razor.Entities
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int OrgId { get; set; }
-        public string Name { get; set; }
-        public ICollection<Course> Courses { get; set; }
+        [Required]
+        public int UserId { get; set; }
+        [Required]
+        public string OrgName { get; set; }
+        [Required]
+        public string WebsiteUrl { get; set; }
+        [Required]
+        public string Services { get; set; }
+        [Required]
+        public string WorkType { get; set; }
     }
 }

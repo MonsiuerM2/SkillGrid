@@ -162,12 +162,7 @@ namespace DMedRazor.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("OrganizationOrgId")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("CourseId");
-
-                    b.HasIndex("OrganizationOrgId");
 
                     b.ToTable("Courses");
                 });
@@ -312,7 +307,22 @@ namespace DMedRazor.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("OrgName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Services")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("WebsiteUrl")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WorkType")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -336,6 +346,12 @@ namespace DMedRazor.Migrations
                     b.Property<int>("NumStudents")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("OrgId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("OrganizationOrgId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("TEXT");
 
@@ -343,7 +359,33 @@ namespace DMedRazor.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.ToTable("Session");
+                    b.HasIndex("OrganizationOrgId");
+
+                    b.ToTable("Sessions");
+                });
+
+            modelBuilder.Entity("DMed_Razor.Entities.SessionRegistration", b =>
+                {
+                    b.Property<int>("SessionRegId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateRegistered")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SessionRegId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("SessionRegistrations");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
@@ -449,13 +491,6 @@ namespace DMedRazor.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DMed_Razor.Entities.Course", b =>
-                {
-                    b.HasOne("DMed_Razor.Entities.Organization", null)
-                        .WithMany("Courses")
-                        .HasForeignKey("OrganizationOrgId");
-                });
-
             modelBuilder.Entity("DMed_Razor.Entities.CourseModules", b =>
                 {
                     b.HasOne("DMed_Razor.Entities.Course", "Course")
@@ -543,7 +578,34 @@ namespace DMedRazor.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DMed_Razor.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationOrgId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Course");
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("DMed_Razor.Entities.SessionRegistration", b =>
+                {
+                    b.HasOne("DMed_Razor.Entities.Session", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DMed_Razor.Entities.AppUser", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
@@ -600,11 +662,6 @@ namespace DMedRazor.Migrations
             modelBuilder.Entity("DMed_Razor.Entities.Module", b =>
                 {
                     b.Navigation("ModulePreReqs");
-                });
-
-            modelBuilder.Entity("DMed_Razor.Entities.Organization", b =>
-                {
-                    b.Navigation("Courses");
                 });
 #pragma warning restore 612, 618
         }
